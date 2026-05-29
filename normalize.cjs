@@ -56,13 +56,8 @@ for (const file of filesToFix) {
 
   const gainApplied = (targetI - measuredI).toFixed(1);
 
-  // 2. Perform second pass normalization to actual file
-  // We use dual-pass for maximum accuracy
-  let normFilter = `loudnorm=I=${targetI}:TP=${targetTP}`;
-  if (jsonMatch) {
-    const stats = JSON.parse(jsonMatch[0]);
-    normFilter += `:measured_I=${stats.input_i}:measured_LRA=${stats.input_lra}:measured_TP=${stats.input_tp}:measured_thresh=${stats.input_thresh}:offset=${stats.target_offset}`;
-  }
+  // 2. Perform volume boost
+  const normFilter = `volume=3.0`;
 
   const normResult = spawnSync(ffmpegPath, [
     '-y', '-hide_banner', '-i', filePath,
@@ -72,31 +67,15 @@ for (const file of filesToFix) {
   ], { encoding: 'utf8' });
 
   if (normResult.status !== 0) {
-    console.error(`Failed to normalize ${file}`);
+    console.error(`Failed to boost ${file}`);
     continue;
   }
 
   // 3. Replace original file
   fs.renameSync(tempPath, filePath);
 
-  // Measure new file
-  const verifyResult = spawnSync(ffmpegPath, [
-    '-hide_banner', '-i', filePath,
-    '-af', `loudnorm=I=${targetI}:TP=${targetTP}:print_format=json`,
-    '-f', 'null', '-'
-  ], { encoding: 'utf8' });
-
-  const verifyMatch = verifyResult.stderr.match(/\{[\s\S]*?\}/);
-  let newLUFS = 'N/A';
-  if (verifyMatch) {
-    try {
-      const stats = JSON.parse(verifyMatch[0]);
-      newLUFS = parseFloat(stats.input_i).toFixed(1);
-    } catch (e) {}
-  }
-
-  console.log(`Normalized ${file}: ${oldLUFS} LUFS -> ${newLUFS} LUFS (${gainApplied} dB)`);
-  reportLines.push(`| **${file}** | ${oldLUFS} | ${newLUFS} | ${gainApplied} |`);
+  console.log(`Boosted ${file} by 3x amplitude`);
+  reportLines.push(`| **${file}** | N/A | N/A | 3x Amplitude (+9.5dB) |`);
 }
 
 const reportContent = reportLines.join('\n');
