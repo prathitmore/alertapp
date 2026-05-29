@@ -52,15 +52,30 @@ export const hapticService = {
       lastHapticTime = now;
       lastHapticPriority = requestPriority;
 
+      let pluginCalled = false;
+      let nativeCalled = false;
+
       if (pattern.duration.length === 1) {
+        pluginCalled = true;
         await Haptics.vibrate({ duration: pattern.duration[0] });
       } else {
-        console.log(`[Native Bridge] Firing Haptic Pattern: ${patternId}`, pattern.duration);
-        await Haptics.vibrate();
+        if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+          nativeCalled = true;
+          // Use our true Android VibratorManager bridge
+          const { registerPlugin } = require('@capacitor/core');
+          const ForegroundServicePlugin = registerPlugin('ForegroundService');
+          await ForegroundServicePlugin.vibratePattern({ pattern: pattern.duration });
+        } else {
+          pluginCalled = true;
+          await Haptics.vibrate();
+        }
       }
+      
+      console.log(`[AURAPING_HAPTIC]\nalert=${hapticConfig.id || 'test'}\npattern=${patternId}\nhapticRequested=true\npluginCalled=${pluginCalled}\nnativeCalled=${nativeCalled}\nsuccess=true`);
       return true;
     } catch (error) {
       console.error(`[Haptic Service] Failed to execute haptic: ${patternId}`, error);
+      console.log(`[AURAPING_HAPTIC]\nalert=${hapticConfig.id || 'test'}\npattern=${patternId}\nhapticRequested=true\npluginCalled=true\nnativeCalled=true\nsuccess=false`);
       return false;
     }
   },
